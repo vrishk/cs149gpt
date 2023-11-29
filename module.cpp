@@ -288,19 +288,67 @@ torch::Tensor myFusedAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
 
     // -------- YOUR CODE HERE  -------- //
     // We give you a template of the first three loops for your convenience
+    #pragma omp parallel for collapse(3)
     //loop over batch
     for (int b = 0; b < B; b++){
+      //loop over heads
+      for (int h = 0; h < H; h++){
+        for (int i = 0; i < N ; i++){
+		      // YRow is moved inside so each OpenMP thread gets a local copy.
+          at::Tensor ORowTensor = temp.index({torch::indexing::Slice(omp_get_thread_num(), torch::indexing::None)});      
+          std::vector<float> QK_t= formatTensor(ORowTensor);
+          std::fill(QK_t.begin(), QK_t.end(), 0);
 
-        //loop over heads
-        for (int h = 0; h < H; h++){
-            for (int i = 0; i < N ; i++){
-
-		// YRow is moved inside so each OpenMP thread gets a local copy.
-                at::Tensor ORowTensor = temp.index({torch::indexing::Slice(omp_get_thread_num(), torch::indexing::None)});      
-                std::vector<float> ORow = formatTensor(ORowTensor);
-		//YOUR CODE HERE
+          float val;
+          
+          for (int kk = 0; kk < N; kk += BLOCK) {
+            uint BLOCK_K = min(kk + BLOCK, N);
+            for (int jj = 0; jj < d; jj += BLOCK) {
+              uint BLOCK_J = min(jj + BLOCK, d);
+              for(int k = kk; k < BLOCK_K; k++){
+                val = QK_t[k];
+                for(int j = jj; j < BLOCK_J; j++){
+                  val += fourDimRead(Q, b, h, i, j, H, N, d) * fourDimRead(K, b, h, k, j, H, N, d);
+                }
+                QK_t[k] = val;
+              }
             }
-	}
+          }
+
+          val = 0.f;
+          float sample, normed;
+          float min_val = 0.f;
+          if (USE_MIN_NUMERIC) {
+            min_val = std::numeric_limits<float>::max();;
+            for (int j = 0; j < N; j++) {
+              sample = QK_t[j];
+              if (sample < min_val) {min_val = sample;}
+            }
+          }
+          for (int j = 0; j < N; j++) {
+            val += exp(QK_t[j] - min_val);
+          }
+          for (int j = 0; j < N; j++) {
+            QK_t[j] = exp(QK_t[j] - min_val) / val;
+          }
+
+          for (int kk = 0; kk < d; kk += BLOCK) {
+            uint BLOCK_K = min(kk + BLOCK, d);
+            for (int jj = 0; jj < N; jj += BLOCK) {
+              uint BLOCK_J = min(jj + BLOCK, N);
+              for(int k = kk; k < BLOCK_K; k++){
+                val = fourDimRead(O, b, h, i, k, H, N, d);
+                for(int j = jj; j < BLOCK_J; j++){
+                  val += QK_t[j] * fourDimRead(V, b, h, j, k, H, N, d);
+                }
+                fourDimWrite(O, b, h, i, k, H, N, d, val);
+              }
+            }
+          }
+
+
+        }
+	    }
     }
 	    
 	
