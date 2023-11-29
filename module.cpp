@@ -183,16 +183,7 @@ torch::Tensor myUnfusedAttentionBlocked(torch::Tensor QTensor, torch::Tensor KTe
     std::vector<float> QK_t = formatTensor(QK_tTensor);
 
     //Code
-    
-    std::vector<float> block_a;
-    block_a.reserve(BLOCK * BLOCK);
-
-    std::vector<float> block_b;
-    block_b.reserve(BLOCK * BLOCK);
-
-    std::vector<float> block_c;
-    block_c.reserve(BLOCK * BLOCK);
-
+    float val;
     for (int b = 0; b < B; b++) {
       for (int h = 0; h < H; h++) {
         
@@ -201,12 +192,18 @@ torch::Tensor myUnfusedAttentionBlocked(torch::Tensor QTensor, torch::Tensor KTe
           for (int k = 0; k < N; k += BLOCK) {
             for (int j = 0; j < d; j += BLOCK) {
               for(int ii = 0; ii < BLOCK; ii++){
-                for(int jj = 0; jj < BLOCK; jj++){
-                  for(int kk = 0; kk < BLOCK; kk++){
-                    float q = fourDimRead(Q, b, h, i + ii, j+jj, H, N, d);
-                    float k_t = fourDimRead(K, b, h, k + kk, j + jj, H, N, d);
-                    val = twoDimRead(QK_t, i + ii, k + kk, N) + q * k_t;
-                    twoDimWrite(QK_t, i + ii, k + kk, N, val);
+                int i_prime = i + ii;
+                if (i_prime >= N) {continue;}
+                for(int kk = 0; kk < BLOCK; kk++){
+                  int k_prime = k + kk;
+                  if (k_prime >= N) {continue;}
+                  for(int jj = 0; jj < BLOCK; jj++){
+                    int j_prime = j + jj;
+                    if (j_prime >= d) {continue;}
+                    float q = fourDimRead(Q, b, h, i_prime, i_prime, H, N, d);
+                    float k_t = fourDimRead(K, b, h, k_prime, j_prime, H, N, d);
+                    val = twoDimRead(QK_t, i_prime, k_prime, N) + q * k_t;
+                    twoDimWrite(QK_t, i_prime, k_prime, N, val);
                   }
                 }
               }
@@ -237,16 +234,23 @@ torch::Tensor myUnfusedAttentionBlocked(torch::Tensor QTensor, torch::Tensor KTe
         }
 
         // QK_t V matmul
-        for (int i = 0; i < N; i++) {
-          for (int k = 0; k < d; k++) {
-            for (int j = 0; j < N; j++) {
+        for (int i = 0; i < N; i += BLOCK) {
+          for (int k = 0; k < d; k += BLOCK) {
+            for (int j = 0; j < N; j += BLOCK) {
               for(int ii = 0; ii < BLOCK; ii++){
-                for(int jj = 0; jj < BLOCK; jj++){
-                  for(int kk = 0; kk < BLOCK; kk++){
-                    float q = twoDimRead(QK_t, i + ii, j + jj, N);
-                    float v = fourDimRead(V, b, h, j + jj, k + kk, H, N, d);
-                    val = twoDimRead(QK_t, i + ii, k + kk, N) + q * v;
-                    fourDimWrite(O, b, h, i, k, H, N, d, val);
+                int i_prime = i + ii;
+                if (i_prime >= N) {continue;}
+                for(int kk = 0; kk < BLOCK; kk++){
+                  int k_prime = k + kk;
+                  if (k_prime >= d) {continue;}
+                  for(int jj = 0; jj < BLOCK; jj++){
+                    int j_prime = j + jj;
+                    if (j_prime >= N) {continue;}
+
+                    float q = twoDimRead(QK_t, i_prime, j_prime, N);
+                    float v = fourDimRead(V, b, h, j_prime, k_prime, H, N, d);
+                    val = twoDimRead(O, i_prime, k_prime, N) + q * v;
+                    fourDimWrite(O, b, h, i_prime, k_prime, H, N, d, val);
                   }
                 }
               }
