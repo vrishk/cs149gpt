@@ -21,7 +21,7 @@ if not path.exists(ispc_path):
     ispc_path = ""
 
 print("\nCompiling code into a PyTorch module...\n\n")
-ms = load(
+mr = load(
     name="custom_module",
     sources=["module.cpp"],
     extra_cflags=["-mavx", "-O3", "-fopenmp"],
@@ -65,8 +65,10 @@ class CustomAttention(nn.Module):
         if self.isRef:
             with record_function("STUDENT - BLOCKED MATMUL + UNFUSED SOFTMAX"):
                 temp = torch.zeros((self.N, self.N))
-                out = mr.myUnfusedAttentionBlocked(self.Q, self.K, self.V, temp, self.B, self.H, self.N, self.d)
-            return out 
+                out = mr.myUnfusedAttentionBlocked(
+                    self.Q, self.K, self.V, temp, self.B, self.H, self.N, self.d
+                )
+            return out
         with record_function("REFERENCE - BLOCKED MATMUL + UNFUSED SOFTMAX"):
             temp = torch.zeros((self.N, self.N))
             out = ms.myUnfusedAttentionBlocked(
@@ -107,11 +109,53 @@ class CustomAttention(nn.Module):
 
         if self.isRef:
             with record_function("STUDENT - FLASH ATTENTION"):
-                out = mr.myFlashAttention(self.Q, self.K, self.V, Qi, Kj, Vj, Sij, Pij, PV, Oi, L, Li, Lij, Lnew, self.bc, self.br, self.B, self.H, self.N, self.d)
+                out = mr.myFlashAttention(
+                    self.Q,
+                    self.K,
+                    self.V,
+                    Qi,
+                    Kj,
+                    Vj,
+                    Sij,
+                    Pij,
+                    PV,
+                    Oi,
+                    L,
+                    Li,
+                    Lij,
+                    Lnew,
+                    self.bc,
+                    self.br,
+                    self.B,
+                    self.H,
+                    self.N,
+                    self.d,
+                )
             return out
         with record_function("REFERENCE - FLASH ATTENTION"):
-            #out = ms.myFlashAttention(self.Q, self.K, self.V, self.B, self.H, self.N, self.d, self.blockSize)
-            out = ms.myFlashAttention(self.Q, self.K, self.V, Qi, Kj, Vj, Sij, Pij, PV, Oi, L, Li, Lij, Lnew, self.bc, self.br, self.B, self.H, self.N, self.d)
+            # out = ms.myFlashAttention(self.Q, self.K, self.V, self.B, self.H, self.N, self.d, self.blockSize)
+            out = ms.myFlashAttention(
+                self.Q,
+                self.K,
+                self.V,
+                Qi,
+                Kj,
+                Vj,
+                Sij,
+                Pij,
+                PV,
+                Oi,
+                L,
+                Li,
+                Lij,
+                Lnew,
+                self.bc,
+                self.br,
+                self.B,
+                self.H,
+                self.N,
+                self.d,
+            )
         return out
 
 
@@ -228,10 +272,15 @@ def part1Test(N, d, B, H):
     attentionModuleReference = CustomAttention(Q, K, V, B, H, N, d, True)
     params = (N, d, B, H)
     print("-----RUNNING REFERENCE IMPLEMENTATION-----\n")
-    testTemplate(attentionModuleStudent.myUnfusedAttention, params, "REFERENCE - NAIVE ATTENTION")
+    testTemplate(
+        attentionModuleStudent.myUnfusedAttention, params, "REFERENCE - NAIVE ATTENTION"
+    )
     time.sleep(3)
     print("-----RUNNING STUDENT IMPLEMENTATION-----\n")
-    testTemplate(attentionModuleReference.myUnfusedAttention, params, "STUDENT - NAIVE ATTENTION")
+    testTemplate(
+        attentionModuleReference.myUnfusedAttention, params, "STUDENT - NAIVE ATTENTION"
+    )
+
 
 def part2Test(N, d, B, H):
     print("Running Part 2 Test: Unfused Attention with Blocked Matmul\n")
@@ -240,10 +289,19 @@ def part2Test(N, d, B, H):
     attentionModuleReference = CustomAttention(Q, K, V, B, H, N, d, True)
     params = (N, d, B, H)
     print("-----RUNNING REFERENCE IMPLEMENTATION-----\n")
-    testTemplate(attentionModuleStudent.myUnfusedAttentionBlocked, params, "REFERENCE - BLOCKED MATMUL + UNFUSED SOFTMAX")
+    testTemplate(
+        attentionModuleStudent.myUnfusedAttentionBlocked,
+        params,
+        "REFERENCE - BLOCKED MATMUL + UNFUSED SOFTMAX",
+    )
     time.sleep(3)
     print("-----RUNNING STUDENT IMPLEMENTATION-----\n")
-    testTemplate(attentionModuleReference.myUnfusedAttentionBlocked, params, "STUDENT - BLOCKED MATMUL + UNFUSED SOFTMAX")
+    testTemplate(
+        attentionModuleReference.myUnfusedAttentionBlocked,
+        params,
+        "STUDENT - BLOCKED MATMUL + UNFUSED SOFTMAX",
+    )
+
 
 def part3Test(N, d, B, H):
     print("Running Part 3 Test: Fused Attention\n")
@@ -252,10 +310,15 @@ def part3Test(N, d, B, H):
     attentionModuleReference = CustomAttention(Q, K, V, B, H, N, d, True)
     params = (N, d, B, H)
     print("-----RUNNING REFERENCE IMPLEMENTATION-----\n")
-    testTemplate(attentionModuleStudent.myFusedAttention, params, "REFERENCE - FUSED ATTENTION")
+    testTemplate(
+        attentionModuleStudent.myFusedAttention, params, "REFERENCE - FUSED ATTENTION"
+    )
     time.sleep(3)
     print("-----RUNNING STUDENT IMPLEMENTATION-----\n")
-    testTemplate(attentionModuleReference.myFusedAttention, params, "STUDENT - FUSED ATTENTION")
+    testTemplate(
+        attentionModuleReference.myFusedAttention, params, "STUDENT - FUSED ATTENTION"
+    )
+
 
 def part4Test(N, d, B, H, bc, br):
     print("Running Part 4 Test: Flash Attention\n")
@@ -264,10 +327,15 @@ def part4Test(N, d, B, H, bc, br):
     attentionModuleReference = CustomAttention(Q, K, V, B, H, N, d, True, bc, br)
     params = (N, d, B, H)
     print("-----RUNNING REFERENCE IMPLEMENTATION-----\n")
-    testTemplate(attentionModuleStudent.myFlashAttention, params, "REFERENCE - FLASH ATTENTION")
+    testTemplate(
+        attentionModuleStudent.myFlashAttention, params, "REFERENCE - FLASH ATTENTION"
+    )
     time.sleep(3)
     print("-----RUNNING STUDENT IMPLEMENTATION-----\n")
-    testTemplate(attentionModuleReference.myFlashAttention, params, "STUDENT - FLASH ATTENTION")
+    testTemplate(
+        attentionModuleReference.myFlashAttention, params, "STUDENT - FLASH ATTENTION"
+    )
+
 
 def accessTest(B, H, N, d):
     Q, _, _ = createQKVSimple(N, d, B, H)
@@ -277,20 +345,30 @@ def accessTest(B, H, N, d):
     h = random.randrange(H)
     i = random.randrange(N)
     j = random.randrange(d)
-    print("\nIndexing Value When: b = " + str(b) + ", h = " + str(h) + ", i = " + str(i) + ", j = " + str(j))
+    print(
+        "\nIndexing Value When: b = "
+        + str(b)
+        + ", h = "
+        + str(h)
+        + ", i = "
+        + str(i)
+        + ", j = "
+        + str(j)
+    )
     expected = round(Q[b][h][i][j].item(), 6)
     result = round(mr.fourDimRead(Q.flatten().tolist(), b, h, i, j, H, N, d), 6)
     print("Expected:", expected)
     print("Result:", result)
     assert abs(expected - result) < 1e-5
-    
+
+
 def main():
-    d = 32
-    B = 1
-    H = 4
-    # d = 2
+    # d = 32
     # B = 1
-    # H = 1
+    # H = 4
+    d = 2
+    B = 1
+    H = 1
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
