@@ -162,7 +162,7 @@ torch::Tensor myNaiveAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
 // ---------------------------------------------------------- //
 //     PART 2: BLOCKED MATRIX MULTIPLY AND UNFUSED SOFTMAX    //
 // ---------------------------------------------------------- //
-const uint BLOCK = 8;
+const int BLOCK = 8;
 
 torch::Tensor myUnfusedAttentionBlocked(torch::Tensor QTensor, torch::Tensor KTensor, torch::Tensor VTensor, torch::Tensor QK_tTensor,
                 int B, int H, int N, int d){
@@ -186,20 +186,20 @@ torch::Tensor myUnfusedAttentionBlocked(torch::Tensor QTensor, torch::Tensor KTe
     float val;
     for (int b = 0; b < B; b++) {
       for (int h = 0; h < H; h++) {
+        std::fill(QK_t.begin(), QK_t.end(), 0);
         
         // QK^t mul
         for (int ii = 0; ii < N; ii += BLOCK) {
+          uint BLOCK_I = min(ii + BLOCK, N);
           for (int kk = 0; kk < N; kk += BLOCK) {
+            uint BLOCK_K = min(kk + BLOCK, N);
             for (int jj = 0; jj < d; jj += BLOCK) {
-
-              for(int i = ii; (i < ii + BLOCK) && (i < N); i++){
-                for(int k = kk; (k < kk + BLOCK) && (k < N); k++){
+              uint BLOCK_J = min(jj + BLOCK, d);
+              for(int i = ii; i < BLOCK_I; i++){
+                for(int k = kk; k < BLOCK_K; k++){
                   val = twoDimRead(QK_t, i, k, N);
-                  for(int j = jj; (j < jj + BLOCK) && (j < d); j++){
-
-                    float q = fourDimRead(Q, b, h, i, j, H, N, d);
-                    float k_t = fourDimRead(K, b, h, k, j, H, N, d);
-                    val += q * k_t;
+                  for(int j = jj; j < BLOCK_J; j++){
+                    val += fourDimRead(Q, b, h, i, j, H, N, d) * fourDimRead(K, b, h, k, j, H, N, d);
                   }
                   twoDimWrite(QK_t, i, k, N, val);
                 }
@@ -234,15 +234,16 @@ torch::Tensor myUnfusedAttentionBlocked(torch::Tensor QTensor, torch::Tensor KTe
 
         // QK_t V matmul
         for (int ii = 0; ii < N; ii += BLOCK) {
+          uint BLOCK_I = min(ii + BLOCK, N);
           for (int kk = 0; kk < d; kk += BLOCK) {
+            uint BLOCK_K = min(kk + BLOCK, d);
             for (int jj = 0; jj < N; jj += BLOCK) {
-              for(int i = ii; (i < ii + BLOCK) && (i < N); i++){
-                for(int k = kk; (k < kk + BLOCK) && (k < d); k++){
+              uint BLOCK_J = min(jj + BLOCK, N);
+              for(int i = ii; i < BLOCK_I; i++){
+                for(int k = kk; k < BLOCK_K; k++){
                   val = fourDimRead(O, b, h, i, k, H, N, d);
-                  for(int j = jj; (j < jj + BLOCK) && (j < N); j++){
-                    float q = twoDimRead(QK_t, i, j, N);
-                    float v = fourDimRead(V, b, h, j, k, H, N, d);
-                    val += q * v;
+                  for(int j = jj; j < BLOCK_J; j++){
+                    val += twoDimRead(QK_t, i, j, N) * fourDimRead(V, b, h, j, k, H, N, d);
                   }
                   fourDimWrite(O, b, h, i, k, H, N, d, val);
                 }

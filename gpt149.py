@@ -363,12 +363,12 @@ def accessTest(B, H, N, d):
 
 
 def main():
-    # d = 32
-    # B = 1
-    # H = 4
-    d = 2
+    d = 32
     B = 1
-    H = 1
+    H = 4
+    # d = 2
+    # B = 1
+    # H = 1
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
