@@ -104,23 +104,10 @@ torch::Tensor myNaiveAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
         matrixMult(Q.data(), K.data(), QK_t.data(), B, H, N, d, b, h);
         softmaxNorm(QK_t.data(), N);
         pvCalc(QK_t.data(), V.data(), O.data(), B, H, N, d, b, h);
-        // // QK_t V matmul
-        // for (int i = 0; i < N; i++) {
-        //   for (int k = 0; k < d; k++) {
-        //     val = 0.f;
-        //     for (int j = 0; j < N; j++) {
-        //       float q = twoDimRead(QK_t, i, j, N);
-        //       float v = fourDimRead(V, b, h, j, k, H, N, d);
-        //       val += q * v;
-        //     }
-        //     fourDimWrite(O, b, h, i, k, H, N, d, val);
-        //   }
-        // }
-
       }
     }   
     // DO NOT EDIT THIS RETURN STATEMENT //
-    // It formats your C++ Vector O back into a Tensor of Shape (B, H, N, d) and returns it //
+    // It formats your C++ Vector O back into a Tensor of Shape (B, H, N, d) and returns it
     return torch::from_blob(O.data(), {B, H, N, d}, torch::TensorOptions().dtype(torch::kFloat32)).clone();
 }
 
@@ -153,71 +140,9 @@ torch::Tensor myUnfusedAttentionBlocked(torch::Tensor QTensor, torch::Tensor KTe
     for (int b = 0; b < B; b++) {
       for (int h = 0; h < H; h++) {
         std::fill(QK_t.begin(), QK_t.end(), 0);
-        
-        // QK^t mul
-        for (int ii = 0; ii < N; ii += BLOCK) {
-          uint BLOCK_I = min(ii + BLOCK, N);
-          for (int kk = 0; kk < N; kk += BLOCK) {
-            uint BLOCK_K = min(kk + BLOCK, N);
-            for (int jj = 0; jj < d; jj += BLOCK) {
-              uint BLOCK_J = min(jj + BLOCK, d);
-              for(int i = ii; i < BLOCK_I; i++){
-                for(int k = kk; k < BLOCK_K; k++){
-                  val = twoDimRead(QK_t, i, k, N);
-                  for(int j = jj; j < BLOCK_J; j++){
-                    val += fourDimRead(Q, b, h, i, j, H, N, d) * fourDimRead(K, b, h, k, j, H, N, d);
-                  }
-                  twoDimWrite(QK_t, i, k, N, val);
-                }
-              }
-            }
-          }
-        }
-        
-        // cout << QK_t << endl;
-
-        
-        // Softmax
-        for (int i = 0; i < N; i++) {
-          val = 0.f;
-          float sample, normed;
-          float min_val = 0.f;
-          if (USE_MIN_NUMERIC) {
-            min_val = std::numeric_limits<float>::max();;
-            for (int j = 0; j < N; j++) {
-              sample = twoDimRead(QK_t, i, j, N);
-              if (sample < min_val) {min_val = sample;}
-            }
-          }
-          for (int j = 0; j < N; j++) {
-            val += exp(twoDimRead(QK_t, i, j, N) - min_val);
-          }
-          for (int j = 0; j < N; j++) {
-            normed = exp(twoDimRead(QK_t, i, j, N) - min_val) / val;
-            twoDimWrite(QK_t, i, j, N, normed);
-          }
-        }
-
-        // QK_t V matmul
-        for (int ii = 0; ii < N; ii += BLOCK) {
-          uint BLOCK_I = min(ii + BLOCK, N);
-          for (int kk = 0; kk < d; kk += BLOCK) {
-            uint BLOCK_K = min(kk + BLOCK, d);
-            for (int jj = 0; jj < N; jj += BLOCK) {
-              uint BLOCK_J = min(jj + BLOCK, N);
-              for(int i = ii; i < BLOCK_I; i++){
-                for(int k = kk; k < BLOCK_K; k++){
-                  val = fourDimRead(O, b, h, i, k, H, N, d);
-                  for(int j = jj; j < BLOCK_J; j++){
-                    val += twoDimRead(QK_t, i, j, N) * fourDimRead(V, b, h, j, k, H, N, d);
-                  }
-                  fourDimWrite(O, b, h, i, k, H, N, d, val);
-                }
-              }
-            }
-          }
-        }
-
+        blockedMatrixMult(Q.data(), K.data(), QK_t.data(), B, H, N, d, b, h, BLOCK);
+        softmaxNorm(QK_t.data(), N);
+        blockedPvCalc(QK_t.data(), V.data(), O.data(), B, H, N, d, b, h, BLOCK);
       }
     }
 
@@ -264,39 +189,10 @@ torch::Tensor myFusedAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
           at::Tensor ORowTensor = temp.index({torch::indexing::Slice(omp_get_thread_num(), torch::indexing::None)});      
           std::vector<float> QK_t= formatTensor(ORowTensor);
           std::fill(QK_t.begin(), QK_t.end(), 0);
-
           float val;
-          
-          for (int kk = 0; kk < N; kk += BLOCK) {
-            uint BLOCK_K = min(kk + BLOCK, N);
-            for (int jj = 0; jj < d; jj += BLOCK) {
-              uint BLOCK_J = min(jj + BLOCK, d);
-              for(int k = kk; k < BLOCK_K; k++){
-                val = QK_t[k];
-                for(int j = jj; j < BLOCK_J; j++){
-                  val += fourDimRead(Q, b, h, i, j, H, N, d) * fourDimRead(K, b, h, k, j, H, N, d);
-                }
-                QK_t[k] = val;
-              }
-            }
-          }
-
-          val = 0.f;
-          float sample, normed;
-          float min_val = 0.f;
-          if (USE_MIN_NUMERIC) {
-            min_val = std::numeric_limits<float>::max();;
-            for (int j = 0; j < N; j++) {
-              sample = QK_t[j];
-              if (sample < min_val) {min_val = sample;}
-            }
-          }
-          for (int j = 0; j < N; j++) {
-            val += exp(QK_t[j] - min_val);
-          }
-          for (int j = 0; j < N; j++) {
-            QK_t[j] = exp(QK_t[j] - min_val) / val;
-          }
+          fusedMatrixMult(Q.data(), K.data(), QK_t.data(), B, H, N, d, b, h, BLOCK, i);
+          fusedSoftmaxNorm(QK_t.data(), N, i);
+          // fusedPvCalc(QK_t.data(), V.data(), O.data(), B, H, N, d, b, h, BLOCK, i);
 
           for (int kk = 0; kk < d; kk += BLOCK) {
             uint BLOCK_K = min(kk + BLOCK, d);
@@ -311,8 +207,6 @@ torch::Tensor myFusedAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
               }
             }
           }
-
-
         }
 	    }
     }
