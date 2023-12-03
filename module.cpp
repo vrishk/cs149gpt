@@ -203,37 +203,6 @@ torch::Tensor myFusedAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
           fusedMatrixMult(Q.data(), K.data(), QK_t.data(), B, H, N, d, b, h, BLOCK, i);
           fusedSoftmaxNorm(QK_t.data(), N, i);
           fusedPvCalc(QK_t.data(), V.data(), O.data(), B, H, N, d, b, h, BLOCK, i);
-          // val = 0.f;
-          // float sample, normed;
-          // float min_val = 0.f;
-          // if (USE_MIN_NUMERIC) {
-          //   min_val = std::numeric_limits<float>::max();;
-          //   for (int j = 0; j < N; j++) {
-          //     sample = QK_t[j];
-          //     if (sample < min_val) {min_val = sample;}
-          //   }
-          // }
-          // for (int j = 0; j < N; j++) {
-          //   val += exp(QK_t[j] - min_val);
-          // }
-          // for (int j = 0; j < N; j++) {
-          //   QK_t[j] = exp(QK_t[j] - min_val) / val;
-          // }
-
-          // for (int kk = 0; kk < d; kk += BLOCK) {
-          //   uint BLOCK_K = min(kk + BLOCK, d);
-          //   for (int jj = 0; jj < N; jj += BLOCK) {
-          //     uint BLOCK_J = min(jj + BLOCK, N);
-          //     for(int k = kk; k < BLOCK_K; k++){
-          //       val = fourDimRead(O, b, h, i, k, H, N, d);
-          //       for(int j = jj; j < BLOCK_J; j++){
-          //         val += QK_t[j] * fourDimRead(V, b, h, j, k, H, N, d);
-          //       }
-          //       fourDimWrite(O, b, h, i, k, H, N, d, val);
-          //     }
-          //   }
-          // }
-
         }
 	    }
     }
