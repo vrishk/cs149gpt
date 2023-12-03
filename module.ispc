@@ -144,9 +144,9 @@ export void fusedMatrixMult( float* uniform X, float* uniform Y, float* uniform 
                     int uniform b, int uniform h, const int uniform BLOCK,
                     const int uniform i) {
     float val;
-    foreach (kk_b = 0 ... (d + BLOCK - 1) / BLOCK) {
-        int kk = kk_b * BLOCK;
-    // for (int kk = 0; kk < N; kk += BLOCK) {
+    // foreach (kk_b = 0 ... (d + BLOCK - 1) / BLOCK) {
+        // int kk = kk_b * BLOCK;
+    for (int kk = 0; kk < N; kk += BLOCK) {
         uint BLOCK_K = min(kk + BLOCK, N);
         for (int jj = 0; jj < d; jj += BLOCK) {
             uint BLOCK_J = min(jj + BLOCK, d);
@@ -168,7 +168,7 @@ export void fusedSoftmaxNorm(float* uniform T, int uniform N, int uniform i) {
     for (int j = 0; j < N; j++) {
         val += exp(T[j] - min_val);
     }
-    foreach (j = 0 ... N) {
+    for (int j = 0; j < N; j++) {
         T[j] = exp(T[j] - min_val) / val;
     }
 }
