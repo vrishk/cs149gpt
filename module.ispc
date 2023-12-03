@@ -144,9 +144,9 @@ export void fusedMatrixMult( float* uniform X, float* uniform Y, float* uniform 
                     int uniform b, int uniform h, const int uniform BLOCK,
                     const int uniform i) {
     float val;
-    // foreach (kk_b = 0 ... (d + BLOCK - 1) / BLOCK) {
-        // int kk = kk_b * BLOCK;
-    for (int kk = 0; kk < N; kk += BLOCK) {
+    foreach (kk_b = 0 ... (N + BLOCK - 1) / BLOCK) {
+        int kk = kk_b * BLOCK;
+    // for (int kk = 0; kk < N; kk += BLOCK) {
         uint BLOCK_K = min(kk + BLOCK, N);
         for (int jj = 0; jj < d; jj += BLOCK) {
             uint BLOCK_J = min(jj + BLOCK, d);
@@ -168,7 +168,8 @@ export void fusedSoftmaxNorm(float* uniform T, int uniform N, int uniform i) {
     for (int j = 0; j < N; j++) {
         val += exp(T[j] - min_val);
     }
-    for (int j = 0; j < N; j++) {
+    // for (int j = 0; j < N; j++) {
+    foreach (j = 0 ... N) {
         T[j] = exp(T[j] - min_val) / val;
     }
 }
@@ -177,18 +178,19 @@ export void fusedPvCalc(float* uniform P, float* uniform V, float* uniform O,
                     int uniform B, int uniform H, int uniform N, int uniform d,
                     int uniform b, int uniform h, const int uniform BLOCK,
                     int uniform i) {
-          float val = 0.f;
-          for (int kk = 0; kk < d; kk += BLOCK) {
-            uint BLOCK_K = min(kk + BLOCK, d);
-            for (int jj = 0; jj < N; jj += BLOCK) {
-              uint BLOCK_J = min(jj + BLOCK, N);
-              for(int k = kk; k < BLOCK_K; k++){
+    float val = 0.f;
+    foreach(kk_b = 0 ... (d + BLOCK - 1) / BLOCK) {
+        int kk = kk_b * BLOCK;
+        uint BLOCK_K = min(kk + BLOCK, d);
+        for (int jj = 0; jj < N; jj += BLOCK) {
+            uint BLOCK_J = min(jj + BLOCK, N);
+            for(int k = kk; k < BLOCK_K; k++){
                 val = fourDimRead(O, b, h, i, k, H, N, d);
                 for(int j = jj; j < BLOCK_J; j++){
-                  val += P[j] * fourDimRead(V, b, h, j, k, H, N, d);
+                    val += P[j] * fourDimRead(V, b, h, j, k, H, N, d);
                 }
                 fourDimWrite(O, b, h, i, k, H, N, d, val);
-              }
             }
-          }  
+        }
+    }  
 }
