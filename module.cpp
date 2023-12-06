@@ -400,7 +400,7 @@ torch::Tensor myFlashAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
     for (int b = 0; b < B; b++) {
       for (int h = 0; h < H; h++) {
         int step = b * (H * N * d) + h * (N * d);
-        std::fill(l.begin(), l.end(), 0);
+        std::fill(l.begin(), l.end(), 0.f);
 
         for (int jj = 0; jj < N; jj += Bc) {
           uint BLOCK_J = min(Bc, N - jj);
@@ -468,7 +468,7 @@ torch::Tensor myFlashAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
 
             for (int i = 0; i < BLOCK_I; i++) {
               for (int k = 0; k < d; k++) {
-                O[step + (ii + i) * d + k] += Oi[i * d + k];
+                O[step + (ii + i) * d + k] = Oi[i * d + k];
               }
               l[ii + i] = lnew[i];
             }

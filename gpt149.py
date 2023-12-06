@@ -161,20 +161,16 @@ class CustomAttention(nn.Module):
 
 # generates dummy matrices for use in part0
 def createQKVSimple(N, d, B, H):
-    # Q = torch.empty(B, H, N, d)
-    # K = torch.empty(B, H, d, N)
-    # V = torch.empty(B, H, N, d)
-    # for b in range(B):
-    #     for h in range(H):
-    #         for i in range(N):
-    #             for j in range(d):
-    #                 Q[b][h][i][j] = 0.0002 * i + 0.0001 * j
-    #                 K[b][h][j][i] = 0.0006 * i + 0.0003 * j
-    #                 V[b][h][i][j] = 0.00015 * i + 0.0008 * j
-    # K = K.transpose(-2, -1)
-    Q = torch.randn(B, H, N, d)
-    K = torch.randn(B, H, d, N)
-    V = torch.randn(B, H, N, d)
+    Q = torch.empty(B, H, N, d)
+    K = torch.empty(B, H, d, N)
+    V = torch.empty(B, H, N, d)
+    for b in range(B):
+        for h in range(H):
+            for i in range(N):
+                for j in range(d):
+                    Q[b][h][i][j] = 0.0002 * i + 0.0001 * j
+                    K[b][h][j][i] = 0.0006 * i + 0.0003 * j
+                    V[b][h][i][j] = 0.00015 * i + 0.0008 * j
     K = K.transpose(-2, -1)
 
     return Q, K, V
@@ -218,12 +214,11 @@ def badSoftmax(Q, K, V):
     return QKV
 
 
-def testTemplate(customFunc, params, test_key, QKV=None):
+def testTemplate(customFunc, params, test_key):
     start = time.time()
     N, d, B, H = params
     # compute pytorch unfused softmax
-    if QKV is None:
-        QKV = createQKVSimple(N, d, B, H)
+    QKV = createQKVSimple(N, d, B, H)
     Q, K, V = QKV
     QKV = badSoftmax(Q, K, V)
     end = time.time()
@@ -338,7 +333,6 @@ def part4Test(N, d, B, H, bc, br):
         attentionModuleStudent.myFlashAttention,
         params,
         "REFERENCE - FLASH ATTENTION",
-        (Q, K, V),
     )
     time.sleep(3)
     print("-----RUNNING STUDENT IMPLEMENTATION-----\n")
@@ -346,7 +340,6 @@ def part4Test(N, d, B, H, bc, br):
         attentionModuleReference.myFlashAttention,
         params,
         "STUDENT - FLASH ATTENTION",
-        (Q, K, V),
     )
 
 
