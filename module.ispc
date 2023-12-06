@@ -17,61 +17,52 @@ inline void fourDimWrite(float* tensor, int x, int y, int z, int b,
 
 // ------------------------ Part 1 Code ------------------------
 
-// performs matrix multiplication, setting Z where Z = XY^T. X and Y must be
-// of the same dimension. Operation done on 4D matrices of size (B, H, N, D).
-export void matrixMult( float* uniform X, float* uniform Y, float* uniform Z,
-                    int uniform B, int uniform H, int uniform N, int uniform d,
-                    int uniform b, int uniform h) {
-    // QK^t mul for a given B and Hx
-    //for  (i = 0 ... N) {
-    for (int i = 0; i < N; i++) {
-        foreach (k = 0 ... N) {
-            float val = 0.f;
-            for (int j = 0; j < d; j++) {
-                float a_val = fourDimRead(X, b, h, i, j, H, N, d);
-                float b_val = fourDimRead(Y, b, h, k, j, H, N, d);
-                val += a_val * b_val;
+
+export void part1(float* uniform Q, float* uniform K, float* uniform V,
+                       float* uniform QK_t, float* uniform O, int uniform B, 
+                       int uniform H, int uniform N, int uniform d) {
+    float val = 0.f;
+    for (int b = 0; b < B; b++) {
+        for (int h = 0; h < H; h++) {
+            // QK^t mul with softmax norm!
+            // for (int i = 0; i < N; i++) {
+            foreach (i = 0 ... N) {
+                float total = 0.f;
+                float val;
+                // foreach (k = 0 ... N) {
+                for (int k = 0; k < N; k++) { // does multiplication while holding onto 
+                    val = 0.f;
+                    for (int j = 0; j < d; j++) {
+                        float a_val = fourDimRead(Q, b, h, i, j, H, N, d);
+                        float b_val = fourDimRead(K, b, h, k, j, H, N, d);
+                        val += a_val * b_val;
+                    }
+                    // take exp and store val for softmax
+                    val = exp(val);
+                    twoDimWrite(QK_t, i, k, N, val);
+                    total += val; 
+                }
+                // finished QK_t calculation for row i; now normalize
+                for (int k = 0; k < N; k++) {
+                  val = twoDimRead(QK_t, i, k, N);
+                  twoDimWrite(QK_t, i, k, N, val / total);
+                }
             }
-            twoDimWrite(Z, i, k, N, val);
+            // output multiplication
+            for (int i = 0; i < N; i++) {
+                foreach (k = 0 ... d) {
+                    val = 0.f;
+                    for (int j = 0; j < N; j++) {
+                        float q = twoDimRead(QK_t, i, j, N);
+                        float v = fourDimRead(V, b, h, j, k, H, N, d);
+                        val += q * v;
+                }
+                fourDimWrite(O, b, h, i, k, H, N, d, val);
+                }
+            }
         }
     }
-}
-
-// Performs in-place softmax and row-based normalization on T.
-export void softmaxNorm(float* uniform T, int uniform N) {
-    // Softmax
-    // foreach (i = 0 ... N) {
-    for (int i = 0; i < N; i++) {   
-        float val = 0.f;
-        float sample, normed;
-        float min_val = 0.f;
-        for (int j = 0; j < N; j++) {
-        val += exp(twoDimRead(T, i, j, N) - min_val);
-        }
-        foreach (j = 0 ... N) {
-        normed = exp(twoDimRead(T, i, j, N) - min_val) / val;
-        twoDimWrite(T, i, j, N, normed);
-        }
-    }
-}
-
-// performs PV calculation for output in the attention layer, storing it in O.
-export void pvCalc(float* uniform P, float* uniform V, float* uniform O,
-                    int uniform B, int uniform H, int uniform N, int uniform d,
-                    int uniform b, int uniform h) {
-    // foreach (i = 0 ... N) {
-    for (int i = 0; i < N; i++) {
-        // for (int k = 0; k < d; k++) {
-        foreach (k = 0 ... d) {
-            float val = 0.f;
-            for (int j = 0; j < N; j++) {
-                float q = twoDimRead(P, i, j, N);
-                float v = fourDimRead(V, b, h, j, k, H, N, d);
-                val += q * v;
-        }
-        fourDimWrite(O, b, h, i, k, H, N, d, val);
-        }
-    }
+        
 }
 
 // ------------------------ Part 2 Code ------------------------
@@ -104,6 +95,24 @@ export void blockedMatrixMult( float* uniform X, float* uniform Y, float* unifor
                     }
                 }
             }
+        }
+    }
+}
+
+// Performs in-place softmax and row-based normalization on T.
+export void softmaxNorm(float* uniform T, int uniform N) {
+    // Softmax
+    // foreach (i = 0 ... N) {
+    for (int i = 0; i < N; i++) {   
+        float val = 0.f;
+        float sample, normed;
+        float min_val = 0.f;
+        for (int j = 0; j < N; j++) {
+        val += exp(twoDimRead(T, i, j, N) - min_val);
+        }
+        foreach (j = 0 ... N) {
+        normed = exp(twoDimRead(T, i, j, N) - min_val) / val;
+        twoDimWrite(T, i, j, N, normed);
         }
     }
 }
@@ -193,4 +202,99 @@ export void fusedPvCalc(float* uniform P, float* uniform V, float* uniform O,
             }
         }
     }  
+}
+
+// --- part 4 code --- // 
+export void part4(float* uniform O, float* uniform Q, float* uniform K, float* uniform V, 
+        float* uniform Sij, float* uniform Pij, float* uniform Kj, float* uniform Vj, 
+        float* uniform Qi, float* uniform Oi, float* uniform l, float* uniform PV, 
+        float* uniform li, float* uniform lij, float* uniform lnew, int uniform Bc, 
+        int uniform Br, int uniform B, int uniform H, int uniform N, int uniform d) {
+
+    for (int b = 0; b < B; b++) {
+      for (int h = 0; h < H; h++) {
+        int step = b * (H * N * d) + h * (N * d);
+        
+        foreach(i = 0 ... N) {
+            l[i] = 0.f;
+        }
+
+        for(int jj = 0; jj < N; jj += Bc) {
+        // foreach (jj_b = 0 ... (N + Bc - 1) / Bc) {
+        //   int jj = jj_b * Bc;
+          
+          uint BLOCK_J = min(Bc, N - jj);
+          for (int j = 0; j < BLOCK_J; j++) {
+            for (int k = 0; k < d; k++) {
+              Kj[j * d + k] = K[step + (jj + j) * d + k];
+              Vj[j * d + k] = V[step + (jj + j) * d + k];
+            }
+          }
+
+          // for (int ii = 0; ii < N; ii += Br) {
+          foreach (ii_b = 0 ... (N + Br - 1) / Br) {
+            int ii = ii_b * Br;
+            uint BLOCK_I = min(Br, N - ii);
+
+            for (int i = 0; i < BLOCK_I; i++) {
+              li[i] = l[ii + i];
+              for (int k = 0; k < d; k++) {
+                Qi[i * d + k] = Q[step + (ii + i) * d + k];
+                Oi[i * d + k] = O[step + (ii + i) * d + k];
+              }
+            }
+
+            // QiKi^T
+            for (int i = 0; i < BLOCK_I; i++) {
+              for (int j = 0; j < BLOCK_J; j++) {
+                float val = 0.f;
+                for (int k = 0; k < d; k++) {
+                  val += Qi[i * d + k] * Kj[j * d + k];
+                }
+                Sij[i * BLOCK_J + j] = val;
+              }
+            }
+
+            // QiKi^T
+            for (int i = 0; i < BLOCK_I; i++) {
+              for (int j = 0; j < BLOCK_J; j++) {
+                Pij[i * BLOCK_J + j] = exp(Sij[i * BLOCK_J + j]);
+              }
+            }
+          
+            // Rowsum
+            for (int i = 0; i < BLOCK_I; i++) {
+              float val = 0.f;
+              for (int j = 0; j < BLOCK_J; j++) {
+                val += Pij[i * BLOCK_J + j];
+              }
+              lij[i] = val;
+            }
+
+            for (int i = 0; i < BLOCK_I; i++) {
+              lnew[i] = li[i] + lij[i];
+            }
+
+            for (int i = 0; i < BLOCK_I; i++) {
+              for (int k = 0; k < d; k++) {
+                float val = 0.f;
+                for (int j = 0; j < BLOCK_J; j++) {
+                  val += Pij[i * BLOCK_J + j] * Vj[j * d + k];
+                }
+                Oi[i * d + k] = (
+                  li[i] * Oi[i * d + k] + val
+                ) / lnew[i];
+              }
+            }
+
+            for (int i = 0; i < BLOCK_I; i++) {
+              for (int k = 0; k < d; k++) {
+                O[step + (ii + i) * d + k] = Oi[i * d + k];
+              }
+              l[ii + i] = lnew[i];
+            }
+          }
+        }
+      }
+    }
 }
