@@ -205,84 +205,86 @@ export void part4(float* uniform O, float* uniform Q, float* uniform K, float* u
         int uniform Br, int uniform B, int uniform H, int uniform N, int uniform d,
         int uniform b, int uniform h) {
 
-        int step = b * (H * N * d) + h * (N * d);
-        foreach(i = 0 ... N) {
-            l[i] = 0.f;
-        }
+  int step = b * (H * N * d) + h * (N * d);
+  foreach(i = 0 ... N) {
+      l[i] = 0.f;
+  }
 
-        for(int jj = 0; jj < N; jj += Bc) {
-        // foreach (jj_b = 0 ... (N + Bc - 1) / Bc) {
-          // int jj = jj_b * Bc;
-          
-          uint BLOCK_J = min(Bc, N - jj);
-          for (int j = 0; j < BLOCK_J; j++) {
-            for (int k = 0; k < d; k++) {
-              Kj[j * d + k] = K[step + (jj + j) * d + k];
-              Vj[j * d + k] = V[step + (jj + j) * d + k];
-            }
-          }
-          for (int ii = 0; ii < N; ii += Br) {
-          // foreach (ii_b = 0 ... (N + Br - 1) / Br) {
-          //   int ii = ii_b * Br;
-            uint BLOCK_I = min(Br, N - ii);
+  for(int jj = 0; jj < N; jj += Bc) {
+  // foreach (jj_b = 0 ... (N + Bc - 1) / Bc) {
+  //   int jj = jj_b * Bc;
+    
+    uint BLOCK_J = min(Bc, N - jj);
+    for (int j = 0; j < BLOCK_J; j++) {
+      // for (int k = 0; k < d; k++) {
+      foreach (k = 0 ... d) {
+        Kj[j * d + k] = K[step + (jj + j) * d + k];
+        Vj[j * d + k] = V[step + (jj + j) * d + k];
+      }
+    }
+    for (int ii = 0; ii < N; ii += Br) {
+    // foreach (ii_b = 0 ... (N + Br - 1) / Br) {
+    //   int ii = ii_b * Br;
+      uint BLOCK_I = min(Br, N - ii);
 
-            for (int i = 0; i < BLOCK_I; i++) {
-              li[i] = l[ii + i];
-              for (int k = 0; k < d; k++) {
-                Qi[i * d + k] = Q[step + (ii + i) * d + k];
-                Oi[i * d + k] = O[step + (ii + i) * d + k];
-              }
-            }
-
-            // QiKi^T
-            for (int i = 0; i < BLOCK_I; i++) {
-              for (int j = 0; j < BLOCK_J; j++) {
-                float val = 0.f;
-                for (int k = 0; k < d; k++) {
-                  val += Qi[i * d + k] * Kj[j * d + k];
-                }
-                Sij[i * BLOCK_J + j] = val;
-              }
-            }
-
-            // QiKi^T
-            for (int i = 0; i < BLOCK_I; i++) {
-              for (int j = 0; j < BLOCK_J; j++) {
-                Pij[i * BLOCK_J + j] = exp(Sij[i * BLOCK_J + j]);
-              }
-            }
-          
-            // Rowsum
-            for (int i = 0; i < BLOCK_I; i++) {
-              float val = 0.f;
-              for (int j = 0; j < BLOCK_J; j++) {
-                val += Pij[i * BLOCK_J + j];
-              }
-              lij[i] = val;
-            }
-
-            for (int i = 0; i < BLOCK_I; i++) {
-              lnew[i] = li[i] + lij[i];
-            }
-
-            for (int i = 0; i < BLOCK_I; i++) {
-              for (int k = 0; k < d; k++) {
-                float val = 0.f;
-                for (int j = 0; j < BLOCK_J; j++) {
-                  val += Pij[i * BLOCK_J + j] * Vj[j * d + k];
-                }
-                Oi[i * d + k] = (
-                  li[i] * Oi[i * d + k] + val
-                ) / lnew[i];
-              }
-            }
-
-            for (int i = 0; i < BLOCK_I; i++) {
-              for (int k = 0; k < d; k++) {
-                O[step + (ii + i) * d + k] = Oi[i * d + k];
-              }
-              l[ii + i] = lnew[i];
-            }
-          }
+      for (int i = 0; i < BLOCK_I; i++) {
+        li[i] = l[ii + i];
+        // for (int k = 0; k < d; k++) {
+        foreach (k = 0 ... d) {
+          Qi[i * d + k] = Q[step + (ii + i) * d + k];
+          Oi[i * d + k] = O[step + (ii + i) * d + k];
         }
       }
+
+      // QiKi^T
+      for (int i = 0; i < BLOCK_I; i++) {
+        for (int j = 0; j < BLOCK_J; j++) {
+          float val = 0.f;
+          for (int k = 0; k < d; k++) {
+            val += Qi[i * d + k] * Kj[j * d + k];
+          }
+          Sij[i * BLOCK_J + j] = val;
+        }
+      }
+
+      // QiKi^T
+      for (int i = 0; i < BLOCK_I; i++) {
+        for (int j = 0; j < BLOCK_J; j++) {
+          Pij[i * BLOCK_J + j] = exp(Sij[i * BLOCK_J + j]);
+        }
+      }
+    
+      // Rowsum
+      for (int i = 0; i < BLOCK_I; i++) {
+        float val = 0.f;
+        for (int j = 0; j < BLOCK_J; j++) {
+          val += Pij[i * BLOCK_J + j];
+        }
+        lij[i] = val;
+      }
+
+      for (int i = 0; i < BLOCK_I; i++) {
+        lnew[i] = li[i] + lij[i];
+      }
+
+      for (int i = 0; i < BLOCK_I; i++) {
+        foreach (k = 0 ... d) {
+          float val = 0.f;
+          for (int j = 0; j < BLOCK_J; j++) {
+            val += Pij[i * BLOCK_J + j] * Vj[j * d + k];
+          }
+          Oi[i * d + k] = (
+            li[i] * Oi[i * d + k] + val
+          ) / lnew[i];
+        }
+      }
+
+      for (int i = 0; i < BLOCK_I; i++) {
+        foreach (k = 0 ... d) {
+          O[step + (ii + i) * d + k] = Oi[i * d + k];
+        }
+        l[ii + i] = lnew[i];
+      }
+    }
+  }
+}
