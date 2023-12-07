@@ -9,8 +9,8 @@
 using namespace std;
 
 // Uncomment for ISPC
-//#include "module_ispc.h"
-//using namespace ispc;
+#include "module_ispc.h"
+using namespace ispc;
 
 // ------------------------------------ //
 // 	WARM-UP: ACCESSING TENSORS      //
@@ -97,7 +97,9 @@ torch::Tensor myNaiveAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
     std::vector<float> QK_t = formatTensor(QK_tTensor);
 
     float val = 0.f;
-    
+    // This line is called instead of the code below it for ISPC
+    // part1(Q.data(), K.data(), V.data(), QK_t.data(), O.data(), B, H, N, d);
+    // -------- YOUR CODE HERE  -------- //
     for (int b = 0; b < B; b++) {
       for (int h = 0; h < H; h++) {
         
@@ -181,8 +183,9 @@ torch::Tensor myUnfusedAttentionBlocked(torch::Tensor QTensor, torch::Tensor KTe
 
     //Format QK_t Tensor into a 2D vector.
     std::vector<float> QK_t = formatTensor(QK_tTensor);
-
-    //Code
+    // This line is called instead of the code below it for ISPC
+    // part2(Q.data(), K.data(), V.data(), QK_t.data(), O.data(), B, H, N, d, BLOCK);
+    // -------- YOUR CODE HERE  -------- //
     float val;
     for (int b = 0; b < B; b++) {
       for (int h = 0; h < H; h++) {
@@ -284,7 +287,24 @@ torch::Tensor myFusedAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
     //Format ORow Tensor into a 1D vector
     // You can simply access this as ORow[i]
     std::vector<float> ORow = formatTensor(ORowTensor);
+    // // The code segment below is used instead of the uncommented code below it for ISPC
+    // #pragma omp parallel for collapse(3)
+    // //loop over batch
+    // for (int b = 0; b < B; b++){
+    //   //loop over heads
+    //   for (int h = 0; h < H; h++){
+    //     for (int i = 0; i < N ; i++){
+    //       at::Tensor ORowTensor = temp.index({torch::indexing::Slice(omp_get_thread_num(), torch::indexing::None)});      
+    //       std::vector<float> QK_t= formatTensor(ORowTensor);
+    //       std::fill(QK_t.begin(), QK_t.end(), 0);
 
+    //       float val;
+    //       fusedMatrixMult(Q.data(), K.data(), QK_t.data(), B, H, N, d, b, h, BLOCK, i);
+    //       fusedSoftmaxNorm(QK_t.data(), N, i);
+    //       fusedPvCalc(QK_t.data(), V.data(), O.data(), B, H, N, d, b, h, BLOCK, i);
+    //     }
+	  //   }
+    // }
 
     // -------- YOUR CODE HERE  -------- //
     // We give you a template of the first three loops for your convenience
@@ -395,8 +415,17 @@ torch::Tensor myFlashAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
     std::vector<float> li = formatTensor(LiTensor);
     std::vector<float> lij = formatTensor(LijTensor);
     std::vector<float> lnew = formatTensor(LnewTensor);
+    // // The code below is used instead of the uncommented code below it for ISPC 
+    // for (int b = 0; b < B; b++) {
+    //   for (int h = 0; h < H; h++) {
+    //     // placed within for loop so each thread has personal copy
+    //     part4(O.data(), Q.data(), K.data(), V.data(), Sij.data(), Pij.data(), Kj.data(), Vj.data(), 
+    //             Qi.data(), Oi.data(), l.data(), PV.data(), li.data(), lij.data(), lnew.data(),
+    //             Bc, Br, B, H, N, d, b, h);
+    //   }
+    // }
 
-
+    // -------- YOUR CODE HERE  -------- //
     for (int b = 0; b < B; b++) {
       for (int h = 0; h < H; h++) {
         int step = b * (H * N * d) + h * (N * d);
