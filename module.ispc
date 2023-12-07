@@ -202,19 +202,17 @@ export void part4(float* uniform O, float* uniform Q, float* uniform K, float* u
         float* uniform Sij, float* uniform Pij, float* uniform Kj, float* uniform Vj, 
         float* uniform Qi, float* uniform Oi, float* uniform l, float* uniform PV, 
         float* uniform li, float* uniform lij, float* uniform lnew, int uniform Bc, 
-        int uniform Br, int uniform B, int uniform H, int uniform N, int uniform d) {
+        int uniform Br, int uniform B, int uniform H, int uniform N, int uniform d,
+        int uniform b, int uniform h) {
 
-    for (int b = 0; b < B; b++) {
-      for (int h = 0; h < H; h++) {
         int step = b * (H * N * d) + h * (N * d);
-        
         foreach(i = 0 ... N) {
             l[i] = 0.f;
         }
 
         for(int jj = 0; jj < N; jj += Bc) {
         // foreach (jj_b = 0 ... (N + Bc - 1) / Bc) {
-        //   int jj = jj_b * Bc;
+          // int jj = jj_b * Bc;
           
           uint BLOCK_J = min(Bc, N - jj);
           for (int j = 0; j < BLOCK_J; j++) {
@@ -223,10 +221,9 @@ export void part4(float* uniform O, float* uniform Q, float* uniform K, float* u
               Vj[j * d + k] = V[step + (jj + j) * d + k];
             }
           }
-
-          // for (int ii = 0; ii < N; ii += Br) {
-          foreach (ii_b = 0 ... (N + Br - 1) / Br) {
-            int ii = ii_b * Br;
+          for (int ii = 0; ii < N; ii += Br) {
+          // foreach (ii_b = 0 ... (N + Br - 1) / Br) {
+          //   int ii = ii_b * Br;
             uint BLOCK_I = min(Br, N - ii);
 
             for (int i = 0; i < BLOCK_I; i++) {
@@ -289,5 +286,3 @@ export void part4(float* uniform O, float* uniform Q, float* uniform K, float* u
           }
         }
       }
-    }
-}

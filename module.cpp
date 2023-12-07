@@ -234,90 +234,17 @@ torch::Tensor myFlashAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
     std::vector<float> li = formatTensor(LiTensor);
     std::vector<float> lij = formatTensor(LijTensor);
     std::vector<float> lnew = formatTensor(LnewTensor);
-
+    
     // -------- YOUR CODE HERE  -------- //
-    part4(O.data(), Q.data(), K.data(), V.data(), Sij.data(), Pij.data(), Kj.data(), Vj.data(), 
-            Qi.data(), Oi.data(), l.data(), PV.data(), li.data(), lij.data(), lnew.data(),
-            Bc, Br, B, H, N, d);
-    // for (int b = 0; b < B; b++) {
-    //   for (int h = 0; h < H; h++) {
-    //     int step = b * (H * N * d) + h * (N * d);
-    //     std::fill(l.begin(), l.end(), 0.f);
-
-    //     for (int jj = 0; jj < N; jj += Bc) {
-    //       uint BLOCK_J = min(Bc, N - jj);
-
-    //       for (int j = 0; j < BLOCK_J; j++) {
-    //         for (int k = 0; k < d; k++) {
-    //           Kj[j * d + k] = K[step + (jj + j) * d + k];
-    //           Vj[j * d + k] = V[step + (jj + j) * d + k];
-    //         }
-    //       }
-
-    //       for (int ii = 0; ii < N; ii += Br) {
-    //         uint BLOCK_I = min(Br, N - ii);
-
-    //         for (int i = 0; i < BLOCK_I; i++) {
-    //           li[i] = l[ii + i];
-    //           for (int k = 0; k < d; k++) {
-    //             Qi[i * d + k] = Q[step + (ii + i) * d + k];
-    //             Oi[i * d + k] = O[step + (ii + i) * d + k];
-    //           }
-    //         }
-
-    //         // QiKi^T
-    //         for (int i = 0; i < BLOCK_I; i++) {
-    //           for (int j = 0; j < BLOCK_J; j++) {
-    //             float val = 0.f;
-    //             for (int k = 0; k < d; k++) {
-    //               val += Qi[i * d + k] * Kj[j * d + k];
-    //             }
-    //             Sij[i * BLOCK_J + j] = val;
-    //           }
-    //         }
-
-    //         // QiKi^T
-    //         for (int i = 0; i < BLOCK_I; i++) {
-    //           for (int j = 0; j < BLOCK_J; j++) {
-    //             Pij[i * BLOCK_J + j] = exp(Sij[i * BLOCK_J + j]);
-    //           }
-    //         }
-          
-    //         // Rowsum
-    //         for (int i = 0; i < BLOCK_I; i++) {
-    //           float val = 0.f;
-    //           for (int j = 0; j < BLOCK_J; j++) {
-    //             val += Pij[i * BLOCK_J + j];
-    //           }
-    //           lij[i] = val;
-    //         }
-
-    //         for (int i = 0; i < BLOCK_I; i++) {
-    //           lnew[i] = li[i] + lij[i];
-    //         }
-
-    //         for (int i = 0; i < BLOCK_I; i++) {
-    //           for (int k = 0; k < d; k++) {
-    //             float val = 0.f;
-    //             for (int j = 0; j < BLOCK_J; j++) {
-    //               val += Pij[i * BLOCK_J + j] * Vj[j * d + k];
-    //             }
-    //             Oi[i * d + k] = (
-    //               li[i] * Oi[i * d + k] + val
-    //             ) / lnew[i];
-    //           }
-    //         }
-
-    //         for (int i = 0; i < BLOCK_I; i++) {
-    //           for (int k = 0; k < d; k++) {
-    //             O[step + (ii + i) * d + k] = Oi[i * d + k];
-    //           }
-    //           l[ii + i] = lnew[i];
-    //         }
-    //       }
-    //     }
-    //   }
-    // }
+    // #pragma omp parallel for collapse(3)
+    for (int b = 0; b < B; b++) {
+      for (int h = 0; h < H; h++) {
+        // placed within for loop so each thread has personal copy
+        part4(O.data(), Q.data(), K.data(), V.data(), Sij.data(), Pij.data(), Kj.data(), Vj.data(), 
+                Qi.data(), Oi.data(), l.data(), PV.data(), li.data(), lij.data(), lnew.data(),
+                Bc, Br, B, H, N, d, b, h);
+      }
+    }
     // DO NOT EDIT THIS RETURN STATEMENT //
     // It formats your C++ Vector O back into a Tensor of Shape (B, H, N, d) and returns it //
     return torch::from_blob(O.data(), {B, H, N, d}, torch::TensorOptions().dtype(torch::kFloat32)).clone();
