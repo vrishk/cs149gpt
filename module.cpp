@@ -96,15 +96,6 @@ torch::Tensor myNaiveAttention(torch::Tensor QTensor, torch::Tensor KTensor, tor
     //Format QK_t Tensor into a 2D vector.
     std::vector<float> QK_t = formatTensor(QK_tTensor);
     // -------- YOUR CODE HERE  -------- //
-
-    float val = 0.f;
-    // for (int b = 0; b < B; b++) {
-    //   for (int h = 0; h < H; h++) {
-    //     matrixMult(Q.data(), K.data(), QK_t.data(), B, H, N, d, b, h);
-    //     softmaxNorm(QK_t.data(), N);
-    //     pvCalc(QK_t.data(), V.data(), O.data(), B, H, N, d, b, h);
-    //   }
-    // }   
     part1(Q.data(), K.data(), V.data(), QK_t.data(), O.data(), B, H, N, d);
     // DO NOT EDIT THIS RETURN STATEMENT //
     // It formats your C++ Vector O back into a Tensor of Shape (B, H, N, d) and returns it
@@ -135,16 +126,8 @@ torch::Tensor myUnfusedAttentionBlocked(torch::Tensor QTensor, torch::Tensor KTe
     //Format QK_t Tensor into a 2D vector.
     std::vector<float> QK_t = formatTensor(QK_tTensor);
 
-    //Code
-    float val;
-    for (int b = 0; b < B; b++) {
-      for (int h = 0; h < H; h++) {
-        std::fill(QK_t.begin(), QK_t.end(), 0);
-        blockedMatrixMult(Q.data(), K.data(), QK_t.data(), B, H, N, d, b, h, BLOCK);
-        softmaxNorm(QK_t.data(), N);
-        blockedPvCalc(QK_t.data(), V.data(), O.data(), B, H, N, d, b, h, BLOCK);
-      }
-    }
+    // -------- YOUR CODE HERE  -------- //
+    part2(Q.data(), K.data(), V.data(), QK_t.data(), O.data(), B, H, N, d, BLOCK);
 
     // DO NOT EDIT THIS RETURN STATEMENT //
     // It formats your C++ Vector O back into a Tensor of Shape (B, H, N, d) and returns it //

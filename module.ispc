@@ -67,63 +67,53 @@ export void part1(float* uniform Q, float* uniform K, float* uniform V,
 
 // ------------------------ Part 2 Code ------------------------
 
-// performs blocked matrix multiplication, setting Z where Z = XY^T. X and Y must be
-// of the same dimension. Operation done on 4D matrices of size (B, H, N, D).
-export void blockedMatrixMult( float* uniform X, float* uniform Y, float* uniform Z,
-                    int uniform B, int uniform H, int uniform N, int uniform d,
-                    int uniform b, int uniform h, const int uniform BLOCK) {
-    float val;
-    // for (int ii = 0; ii < N; ii += BLOCK) {
-    foreach (ii_b = 0 ... (N + BLOCK - 1) / BLOCK) {
-        int ii = ii_b * BLOCK;
-        uint BLOCK_I = min(ii + BLOCK, N);
-        for (int kk = 0; kk < N; kk += BLOCK) {
-        // foreach (kk_b = 0 ... (N + BLOCK - 1) / BLOCK) {
-            // int kk = kk_b * BLOCK;
-            uint BLOCK_K = min(kk + BLOCK, N);
-            for (int jj = 0; jj < d; jj += BLOCK) {
-                uint BLOCK_J = min(jj + BLOCK, d);
-                for(int i = ii; i < BLOCK_I; i++){
-                // foreach (i = ii ... BLOCK_I) {
-                    for(int k = kk; k < BLOCK_K; k++){
-                        val = twoDimRead(Z, i, k, N);
-                        for(int j = jj; j < BLOCK_J; j++){
-                            val += fourDimRead(X, b, h, i, j, H, N, d) * 
-                                        fourDimRead(Y, b, h, k, j, H, N, d);
-                        }
-                        twoDimWrite(Z, i, k, N, val);
-                    }
-                }
-            }
-        }
-    }
-}
-
-// Performs in-place softmax and row-based normalization on T.
-export void softmaxNorm(float* uniform T, int uniform N) {
-    // Softmax
-    // foreach (i = 0 ... N) {
-    for (int i = 0; i < N; i++) {   
-        float val = 0.f;
+export void part2(float* uniform Q, float* uniform K, float* uniform V,float* uniform QK_t, 
+                    float* uniform O, int uniform B, int uniform H, int uniform N, 
+                    int uniform d, const int uniform BLOCK) {
+  for (int b = 0; b < B; b++) {
+    for (int h = 0; h < H; h++) {
+      float val;
+      // blocked matrix mult
+      // for (int ii = 0; ii < N; ii += BLOCK) {
+      foreach (ii_b = 0 ... (N + BLOCK - 1) / BLOCK) {
+          int ii = ii_b * BLOCK;
+          uint BLOCK_I = min(ii + BLOCK, N);
+          for (int kk = 0; kk < N; kk += BLOCK) {
+          // foreach (kk_b = 0 ... (N + BLOCK - 1) / BLOCK) {
+              // int kk = kk_b * BLOCK;
+              uint BLOCK_K = min(kk + BLOCK, N);
+              for (int jj = 0; jj < d; jj += BLOCK) {
+                  uint BLOCK_J = min(jj + BLOCK, d);
+                  for(int i = ii; i < BLOCK_I; i++){
+                  // foreach (i = ii ... BLOCK_I) {
+                      for(int k = kk; k < BLOCK_K; k++){
+                          val = twoDimRead(QK_t, i, k, N);
+                          for(int j = jj; j < BLOCK_J; j++){
+                              val += fourDimRead(Q, b, h, i, j, H, N, d) * 
+                                          fourDimRead(K, b, h, k, j, H, N, d);
+                          }
+                          twoDimWrite(QK_t, i, k, N, val);
+                      }
+                  }
+              }
+          }
+      }
+      // softmax norm
+      for (int i = 0; i < N; i++) {   
+        val = 0.f;
         float sample, normed;
         float min_val = 0.f;
         for (int j = 0; j < N; j++) {
-        val += exp(twoDimRead(T, i, j, N) - min_val);
+          val += exp(twoDimRead(QK_t, i, j, N) - min_val);
         }
         foreach (j = 0 ... N) {
-        normed = exp(twoDimRead(T, i, j, N) - min_val) / val;
-        twoDimWrite(T, i, j, N, normed);
+          normed = exp(twoDimRead(QK_t, i, j, N) - min_val) / val;
+          twoDimWrite(QK_t, i, j, N, normed);
         }
-    }
-}
-
-// performs blocked PV calculation for output in the attention layer, storing it in O.
-export void blockedPvCalc(float* uniform P, float* uniform V, float* uniform O,
-                    int uniform B, int uniform H, int uniform N, int uniform d,
-                    int uniform b, int uniform h, const int uniform BLOCK) {
-    float val;
-    // for (int ii = 0; ii < N; ii += BLOCK) {
-    foreach (ii_b = 0 ... (N + BLOCK - 1) / BLOCK) {
+      }
+      val = 0.f;
+      // output mult
+      foreach (ii_b = 0 ... (N + BLOCK - 1) / BLOCK) {
         int ii = ii_b * BLOCK;
         uint BLOCK_I = min(ii + BLOCK, N);
         for (int kk = 0; kk < d; kk += BLOCK) {
@@ -136,7 +126,7 @@ export void blockedPvCalc(float* uniform P, float* uniform V, float* uniform O,
                     for(int k = kk; k < BLOCK_K; k++){
                         val = fourDimRead(O, b, h, i, k, H, N, d);
                         for(int j = jj; j < BLOCK_J; j++){
-                            val += twoDimRead(P, i, j, N) * fourDimRead(V, b, h, j, k, H, N, d);
+                            val += twoDimRead(QK_t, i, j, N) * fourDimRead(V, b, h, j, k, H, N, d);
                         }
                         fourDimWrite(O, b, h, i, k, H, N, d, val);
                     }
@@ -144,6 +134,9 @@ export void blockedPvCalc(float* uniform P, float* uniform V, float* uniform O,
             }
         }
     }
+    }
+    
+  }
 }
 
 // ------------------------ Part 3 Code
